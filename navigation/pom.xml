@@ -10,19 +10,19 @@
     <name>GraphHopper Navigation</name>
 
     <parent>
-        <groupId>com.graphhopper</groupId>
+        <groupId>com.expedia.geo.graphhopper</groupId>
         <artifactId>graphhopper-parent</artifactId>
         <version>2.0-SNAPSHOT</version>
     </parent>  
 
     <dependencies>
         <dependency>
-            <groupId>com.graphhopper</groupId>
+            <groupId>com.expedia.geo.graphhopper</groupId>
             <artifactId>graphhopper-web-api</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.graphhopper</groupId>
+            <groupId>com.expedia.geo.graphhopper</groupId>
             <artifactId>graphhopper-reader-osm</artifactId>
             <version>${project.parent.version}</version>
         </dependency>

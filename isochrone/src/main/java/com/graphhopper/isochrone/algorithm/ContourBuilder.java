@@ -16,6 +16,7 @@ package com.graphhopper.isochrone.algorithm;
 import org.locationtech.jts.algorithm.CGAlgorithms;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.geom.prep.PreparedPolygon;
+import org.locationtech.jts.simplify.VWSimplifier;
 import org.locationtech.jts.triangulate.quadedge.Vertex;
 
 import java.util.*;
@@ -32,6 +33,7 @@ import java.util.*;
 public class ContourBuilder {
 
     private static final double EPSILON = 0.000001;
+    private static final double MINIMUM_HOLE_AREA = 0.00011;
 
     // OpenStreetMap has 1E7 (coordinates with 7 decimal places), and we walk on the edges of that grid,
     // so we use 1E8 so we can, in theory, always wedge a point petween any two OSM points.
@@ -119,10 +121,16 @@ public class ContourBuilder {
         List<LinearRing> holes = new ArrayList<>(rings.size() / 2);
         // 1. Split the polygon list in two: shells and holes (CCW and CW)
         for (LinearRing ring : rings) {
-            if (CGAlgorithms.signedArea(ring.getCoordinateSequence()) > 0.0)
+            if (CGAlgorithms.signedArea(ring.getCoordinateSequence()) > 0.0) {
                 holes.add(ring);
-            else
-                shells.add(new PreparedPolygon(geometryFactory.createPolygon(ring)));
+            } else {
+                Geometry p = VWSimplifier.simplify(geometryFactory.createPolygon(ring), 0.00001);
+                if (p.isValid() && !p.isEmpty()) {
+                    for (int i = 0; i < p.getNumGeometries(); i++) {
+                        shells.add(new PreparedPolygon((Polygon) p.getGeometryN(i)));
+                    }
+                }
+            }
         }
         // 2. Sort the shells based on number of points to optimize step 3.
         shells.sort((o1, o2) -> o2.getGeometry().getNumPoints() - o1.getGeometry().getNumPoints());
@@ -134,12 +142,11 @@ public class ContourBuilder {
             outer: {
                 // Probably most of the time, the first shell will be the one
                 for (PreparedPolygon shell : shells) {
-                    if (shell.contains(hole)) {
+                    if (shell.contains(hole) && geometryFactory.createPolygon(hole).getArea() > MINIMUM_HOLE_AREA) {
                         ((List<LinearRing>) shell.getGeometry().getUserData()).add(hole);
                         break outer;
                     }
                 }
-                throw new RuntimeException("Found a hole without a shell.");
             }
         }
         // 4. Build the list of punched polygons

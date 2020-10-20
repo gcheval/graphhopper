@@ -48,6 +48,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.conveyal.gtfs.model.Entity.Writer.convertToGtfsTime;
+import static java.lang.Math.max;
 import static java.time.temporal.ChronoUnit.DAYS;
 
 class GtfsReader {

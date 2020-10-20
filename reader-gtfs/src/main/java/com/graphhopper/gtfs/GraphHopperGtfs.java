@@ -18,6 +18,23 @@
 
 package com.graphhopper.gtfs;
 
+import java.io.File;
+import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Stream;
+import java.util.zip.ZipFile;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Transfer;
 import com.graphhopper.GraphHopperConfig;
@@ -38,16 +55,6 @@ import com.graphhopper.util.EdgeExplorer;
 import com.graphhopper.util.EdgeIterator;
 import com.graphhopper.util.EdgeIteratorState;
 import com.graphhopper.util.PointList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.*;
-import java.util.stream.Stream;
-import java.util.zip.ZipFile;
 
 public class GraphHopperGtfs extends GraphHopperOSM {
 
@@ -184,7 +191,7 @@ public class GraphHopperGtfs extends GraphHopperOSM {
                     gtfsReader.buildPtNetwork();
                     readers.put(id, gtfsReader);
                 });
-                insertTransfersBetweenFeeds(readers);
+//                insertTransfersBetweenFeeds(readers);
             } catch (Exception e) {
                 throw new RuntimeException("Error while constructing transit network. Is your GTFS file valid? Please check log for possible causes.", e);
             }

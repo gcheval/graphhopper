@@ -17,22 +17,27 @@
  */
 package com.graphhopper.http;
 
-import com.graphhopper.http.cli.ImportCommand;
-import com.graphhopper.http.resources.RootResource;
-import com.graphhopper.navigation.NavigateResource;
+import java.io.File;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
+import javax.servlet.DispatcherType;
+
 import io.dropwizard.Application;
 import io.dropwizard.bundles.assets.ConfiguredAssetsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 
-import javax.servlet.DispatcherType;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
+import org.apache.commons.io.FileUtils;
+
+import com.graphhopper.http.cli.ImportCommand;
+import com.graphhopper.http.resources.RootResource;
+import com.graphhopper.navigation.NavigateResource;
 
 public final class GraphHopperApplication extends Application<GraphHopperServerConfiguration> {
 
     public static void main(String[] args) throws Exception {
+        FileUtils.deleteDirectory(new File("graph-cache"));
         new GraphHopperApplication().run(args);
     }
 

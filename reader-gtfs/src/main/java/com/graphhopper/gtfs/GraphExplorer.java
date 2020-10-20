@@ -18,14 +18,6 @@
 
 package com.graphhopper.gtfs;
 
-import com.graphhopper.routing.util.DefaultEdgeFilter;
-import com.graphhopper.routing.util.EdgeFilter;
-import com.graphhopper.routing.weighting.Weighting;
-import com.graphhopper.storage.Graph;
-import com.graphhopper.util.EdgeExplorer;
-import com.graphhopper.util.EdgeIterator;
-import com.graphhopper.util.EdgeIteratorState;
-
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -37,8 +29,17 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import com.graphhopper.routing.util.DefaultEdgeFilter;
+import com.graphhopper.routing.util.EdgeFilter;
+import com.graphhopper.routing.weighting.Weighting;
+import com.graphhopper.storage.Graph;
+import com.graphhopper.util.EdgeExplorer;
+import com.graphhopper.util.EdgeIterator;
+import com.graphhopper.util.EdgeIteratorState;
+
 public final class GraphExplorer {
 
+    private final Graph graph;
     private final EdgeExplorer edgeExplorer;
     private final PtEncodedValues flagEncoder;
     private final GtfsStorage gtfsStorage;
@@ -48,8 +49,13 @@ public final class GraphExplorer {
     private final boolean walkOnly;
     private double walkSpeedKmH;
     private boolean ignoreValidities;
+    private long maxTravelTime;
 
     public GraphExplorer(Graph graph, Weighting accessEgressWeighting, PtEncodedValues flagEncoder, GtfsStorage gtfsStorage, RealtimeFeed realtimeFeed, boolean reverse, boolean walkOnly, double walkSpeedKmh, boolean ignoreValidities) {
+        this(graph, accessEgressWeighting, flagEncoder, gtfsStorage, realtimeFeed, reverse, walkOnly, walkSpeedKmh, ignoreValidities, Integer.MAX_VALUE);
+    }
+
+    public GraphExplorer(Graph graph, Weighting accessEgressWeighting, PtEncodedValues flagEncoder, GtfsStorage gtfsStorage, RealtimeFeed realtimeFeed, boolean reverse, boolean walkOnly, double walkSpeedKmh, boolean ignoreValidities, long maxTravelTime) {
         this.accessEgressWeighting = accessEgressWeighting;
         this.ignoreValidities = ignoreValidities;
         DefaultEdgeFilter accessEgressIn = DefaultEdgeFilter.inEdges(accessEgressWeighting.getFlagEncoder());
@@ -65,6 +71,12 @@ public final class GraphExplorer {
         this.reverse = reverse;
         this.walkOnly = walkOnly;
         this.walkSpeedKmH = walkSpeedKmh;
+        this.graph = graph;
+        this.maxTravelTime = maxTravelTime;
+    }
+
+    public Graph getGraph() {
+        return graph;
     }
 
     Stream<EdgeIteratorState> exploreEdgesAround(Label label) {
@@ -87,7 +99,7 @@ public final class GraphExplorer {
                     // reduce total number of relaxed nodes, but takes stress
                     // off the priority queue. Additionally, when only walking,
                     // don't bother finding the enterEdge, because we are not going to enter.
-                    if (edgeType == GtfsStorage.EdgeType.ENTER_TIME_EXPANDED_NETWORK) {
+                     if (edgeType == GtfsStorage.EdgeType.TRAVELLING_PT) {
                         if (walkOnly) {
                             return false;
                         } else {
@@ -116,16 +128,11 @@ public final class GraphExplorer {
 
     long calcTravelTimeMillis(EdgeIteratorState edge, long earliestStartTime) {
         GtfsStorage.EdgeType edgeType = edge.get(flagEncoder.getTypeEnc());
+
         switch (edgeType) {
             case HIGHWAY:
                 // todo: why do we not account for turn times here ?
                 return (long) (accessEgressWeighting.calcEdgeMillis(edge, reverse) * (5.0 / walkSpeedKmH));
-            case ENTER_TIME_EXPANDED_NETWORK:
-                if (reverse) {
-                    return 0;
-                } else {
-                    return waitingTime(edge, earliestStartTime);
-                }
             case LEAVE_TIME_EXPANDED_NETWORK:
                 if (reverse) {
                     return -waitingTime(edge, earliestStartTime);
@@ -150,7 +157,7 @@ public final class GraphExplorer {
     }
 
     private long waitingTime(EdgeIteratorState edge, long earliestStartTime) {
-        long l = edge.get(flagEncoder.getTimeEnc()) * 1000 - millisOnTravelDay(edge, earliestStartTime);
+        long l = edge.get(flagEncoder.getTimeEnc()) * 1000 - millisOnTravelDay(edge, 0);
         if (!reverse) {
             if (l < 0) l = l + 24 * 60 * 60 * 1000;
         } else {
@@ -166,11 +173,16 @@ public final class GraphExplorer {
 
     private boolean isValidOn(EdgeIteratorState edge, long instant) {
         GtfsStorage.EdgeType edgeType = edge.get(flagEncoder.getTypeEnc());
+
         if (edgeType == GtfsStorage.EdgeType.BOARD || edgeType == GtfsStorage.EdgeType.ALIGHT) {
-            final int validityId = edge.get(flagEncoder.getValidityIdEnc());
-            final GtfsStorage.Validity validity = realtimeFeed.getValidity(validityId);
-            final int trafficDay = (int) ChronoUnit.DAYS.between(validity.start, Instant.ofEpochMilli(instant).atZone(validity.zoneId).toLocalDate());
-            return trafficDay >= 0 && validity.validity.get(trafficDay);
+            if (maxTravelTime == Integer.MAX_VALUE) {
+                final int validityId = edge.get(flagEncoder.getValidityIdEnc());
+                final GtfsStorage.Validity validity = realtimeFeed.getValidity(validityId);
+                final int trafficDay = (int) ChronoUnit.DAYS.between(validity.start, Instant.ofEpochMilli(instant).atZone(validity.zoneId).toLocalDate());
+                return trafficDay >= 0 && validity.validity.get(trafficDay);
+            } else {
+                return instant <= maxTravelTime;
+            }
         } else {
             return true;
         }

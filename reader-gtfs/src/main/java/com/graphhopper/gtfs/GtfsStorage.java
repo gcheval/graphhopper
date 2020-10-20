@@ -18,10 +18,20 @@
 
 package com.graphhopper.gtfs;
 
-import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.model.Fare;
-import com.google.transit.realtime.GtfsRealtime;
-import com.graphhopper.storage.Directory;
+import java.io.File;
+import java.io.IOException;
+import java.io.Serializable;
+import java.nio.file.Files;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.zip.ZipFile;
+
 import org.mapdb.Bind;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -29,14 +39,10 @@ import org.mapdb.HTreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.Serializable;
-import java.nio.file.Files;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.*;
-import java.util.zip.ZipFile;
+import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.model.Fare;
+import com.google.transit.realtime.GtfsRealtime;
+import com.graphhopper.storage.Directory;
 
 public class GtfsStorage implements GtfsStorageI {
 
@@ -132,7 +138,8 @@ public class GtfsStorage implements GtfsStorageI {
 	private Map<FeedIdWithStopId, Integer> stationNodes;
 
 	public enum EdgeType {
-		HIGHWAY, ENTER_TIME_EXPANDED_NETWORK, LEAVE_TIME_EXPANDED_NETWORK, ENTER_PT, EXIT_PT, HOP, DWELL, BOARD, ALIGHT, OVERNIGHT, TRANSFER, WAIT, WAIT_ARRIVAL
+		HIGHWAY, ENTER_TIME_EXPANDED_NETWORK, LEAVE_TIME_EXPANDED_NETWORK, ENTER_PT, EXIT_PT, HOP, DWELL, BOARD, ALIGHT, OVERNIGHT, TRANSFER, WAIT, WAIT_ARRIVAL, ENTER_PT_STOP,
+		TRAVELLING_PT, ALIGHT_PT, BOARD_PT, HOP_BETWEEN_STOP
     }
 
 	private DB data;

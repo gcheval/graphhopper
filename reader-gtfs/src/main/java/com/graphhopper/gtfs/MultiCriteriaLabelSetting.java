@@ -17,17 +17,31 @@
  */
 package com.graphhopper.gtfs;
 
-import com.carrotsearch.hppc.IntObjectHashMap;
-import com.carrotsearch.hppc.IntObjectMap;
-import com.graphhopper.routing.ev.IntEncodedValue;
-import com.graphhopper.util.EdgeIterator;
-
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+import java.util.PriorityQueue;
+import java.util.Spliterators;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Point;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.carrotsearch.hppc.IntObjectHashMap;
+import com.carrotsearch.hppc.IntObjectMap;
+import com.graphhopper.routing.ev.IntEncodedValue;
+import com.graphhopper.storage.NodeAccess;
+import com.graphhopper.util.DistanceCalcEarth;
+import com.graphhopper.util.EdgeIterator;
 
 /**
  * Implements a Multi-Criteria Label Setting (MLS) path finding algorithm
@@ -39,6 +53,9 @@ import java.util.stream.StreamSupport;
  * @author Wesam Herbawi
  */
 public class MultiCriteriaLabelSetting {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(MultiCriteriaLabelSetting.class);
+    private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory();
 
     public interface SPTVisitor {
         void visit(Label label);
@@ -114,7 +131,7 @@ public class MultiCriteriaLabelSetting {
 
         MultiCriteriaLabelSettingSpliterator(int from) {
             super(0, 0);
-            Label label = new Label(startTime, EdgeIterator.NO_EDGE, from, 0, 0.0, null, 0, 0, false, null);
+            Label label = new Label(0, EdgeIterator.NO_EDGE, from, 0, 0.0, 0L, 0, 0, false, null);
             ArrayList<Label> labels = new ArrayList<>(1);
             labels.add(label);
             fromMap.put(from, labels);
@@ -145,7 +162,7 @@ public class MultiCriteriaLabelSetting {
                     Long firstPtDepartureTime = label.departureTime;
                     if (!reverse && (edgeType == GtfsStorage.EdgeType.ENTER_TIME_EXPANDED_NETWORK || edgeType == GtfsStorage.EdgeType.WAIT)) {
                         if (label.nTransfers == 0) {
-                            firstPtDepartureTime = nextTime - label.walkTime;
+                            nextTime = firstPtDepartureTime = label.walkTime; // SYNC departure with walking arrival when there's no transfers involved
                         }
                     } else if (reverse && (edgeType == GtfsStorage.EdgeType.LEAVE_TIME_EXPANDED_NETWORK || edgeType == GtfsStorage.EdgeType.WAIT_ARRIVAL)) {
                         if (label.nTransfers == 0) {
@@ -168,6 +185,8 @@ public class MultiCriteriaLabelSetting {
                     long residualDelay;
                     if (!reverse) {
                         if (edgeType == GtfsStorage.EdgeType.WAIT || edgeType == GtfsStorage.EdgeType.TRANSFER) {
+                            residualDelay = Math.max(0, label.residualDelay - explorer.calcTravelTimeMillis(edge, label.currentTime));
+                        } else if (edgeType == GtfsStorage.EdgeType.BOARD_PT) {
                             residualDelay = Math.max(0, label.residualDelay - explorer.calcTravelTimeMillis(edge, label.currentTime));
                         } else if (edgeType == GtfsStorage.EdgeType.ALIGHT) {
                             residualDelay = label.residualDelay + explorer.getDelayFromAlightEdge(edge, label.currentTime);
@@ -192,6 +211,29 @@ public class MultiCriteriaLabelSetting {
                         insertIfNotDominated(sptEntries, newLabel);
                     } else {
                         Label newLabel = new Label(nextTime, edge.getEdge(), edge.getAdjNode(), nTransfers, walkDistanceOnCurrentLeg, firstPtDepartureTime, walkTime, residualDelay, impossible, label);
+                        NodeAccess nodeAccess = explorer.getGraph().getNodeAccess();
+
+                        if (edgeType == GtfsStorage.EdgeType.HOP_BETWEEN_STOP) {
+                            Point source = GEOMETRY_FACTORY.createPoint(
+                                new Coordinate(nodeAccess.getLat(label.adjNode),
+                                    nodeAccess.getLon(label.adjNode))
+                            );
+                            Point destination = GEOMETRY_FACTORY.createPoint(
+                                new Coordinate(nodeAccess.getLat(newLabel.adjNode),
+                                    nodeAccess.getLon(newLabel.adjNode))
+                            );
+
+                            System.out.println(edge.getName() + ". Travelling from "
+                                + source
+                                + " to "
+                                + destination
+                                + " in "
+                                + (nextTime - label.currentTime) / 1000
+                                + " seconds and "
+                                + DistanceCalcEarth.DIST_EARTH.calcDist(source.getY(), source.getX(), destination.getY(), destination.getX())
+                                + " meters. Total time = "
+                                + nextTime);
+                        }
                         insertIfNotDominated(sptEntries, newLabel);
                     }
                 });

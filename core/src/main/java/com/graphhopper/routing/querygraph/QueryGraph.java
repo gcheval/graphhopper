@@ -17,6 +17,13 @@
  */
 package com.graphhopper.routing.querygraph;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
 import com.carrotsearch.hppc.IntArrayList;
 import com.carrotsearch.hppc.IntObjectMap;
 import com.carrotsearch.hppc.cursors.IntCursor;
@@ -36,8 +43,6 @@ import com.graphhopper.util.EdgeIterator;
 import com.graphhopper.util.EdgeIteratorState;
 import com.graphhopper.util.GHUtility;
 import com.graphhopper.util.shapes.BBox;
-
-import java.util.*;
 
 /**
  * A class which is used to query the underlying graph with real GPS points. It does so by

@@ -37,5 +37,5 @@ local.properties
 **/node_modules
 *.zip
 .DS_Store
-/graph-cache_full
+/graph-cache
 package-lock.json

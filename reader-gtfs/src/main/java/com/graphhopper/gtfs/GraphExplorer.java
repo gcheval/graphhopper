@@ -53,7 +53,7 @@ public final class GraphExplorer {
     private long maxTravelTime;
 
     public GraphExplorer(Graph graph, Weighting accessEgressWeighting, PtEncodedValues flagEncoder, GtfsStorage gtfsStorage, RealtimeFeed realtimeFeed, boolean reverse, boolean walkOnly, double walkSpeedKmh, boolean ignoreValidities) {
-        this(graph, accessEgressWeighting, flagEncoder, gtfsStorage, realtimeFeed, reverse, walkOnly, walkSpeedKmh, ignoreValidities, 0);
+        this(graph, accessEgressWeighting, flagEncoder, gtfsStorage, realtimeFeed, reverse, walkOnly, walkSpeedKmh, ignoreValidities, Integer.MAX_VALUE);
     }
 
     public GraphExplorer(Graph graph, Weighting accessEgressWeighting, PtEncodedValues flagEncoder, GtfsStorage gtfsStorage, RealtimeFeed realtimeFeed, boolean reverse, boolean walkOnly, double walkSpeedKmh, boolean ignoreValidities, long maxTravelTime) {
@@ -162,7 +162,7 @@ public final class GraphExplorer {
     private long waitingTime(EdgeIteratorState edge, long earliestStartTime) {
         long l = edge.get(flagEncoder.getTimeEnc()) * 1000 - millisOnTravelDay(edge, 0);
         if (!reverse) {
-            if (l < 0) l = l + 24 * 60 * 60 * 1000; // Next day
+            if (l < 0) l = l + 24 * 60 * 60 * 1000;
         } else {
             if (l > 0) l = l - 24 * 60 * 60 * 1000;
         }
@@ -178,7 +178,14 @@ public final class GraphExplorer {
         GtfsStorage.EdgeType edgeType = edge.get(flagEncoder.getTypeEnc());
 
         if (edgeType == GtfsStorage.EdgeType.BOARD || edgeType == GtfsStorage.EdgeType.ALIGHT) {
-            return instant <= maxTravelTime;
+            if (maxTravelTime == Integer.MAX_VALUE) {
+                final int validityId = edge.get(flagEncoder.getValidityIdEnc());
+                final GtfsStorage.Validity validity = realtimeFeed.getValidity(validityId);
+                final int trafficDay = (int) ChronoUnit.DAYS.between(validity.start, Instant.ofEpochMilli(instant).atZone(validity.zoneId).toLocalDate());
+                return trafficDay >= 0 && validity.validity.get(trafficDay);
+            } else {
+                return instant <= maxTravelTime;
+            }
         } else {
             return true;
         }

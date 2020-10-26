@@ -121,16 +121,10 @@ public class ContourBuilder {
         List<LinearRing> holes = new ArrayList<>(rings.size() / 2);
         // 1. Split the polygon list in two: shells and holes (CCW and CW)
         for (LinearRing ring : rings) {
-            if (CGAlgorithms.signedArea(ring.getCoordinateSequence()) > 0.0) {
+            if (CGAlgorithms.signedArea(ring.getCoordinateSequence()) > 0.0)
                 holes.add(ring);
-            } else {
-                Geometry p = VWSimplifier.simplify(geometryFactory.createPolygon(ring), 0.00001);
-                if (p.isValid() && !p.isEmpty()) {
-                    for (int i = 0; i < p.getNumGeometries(); i++) {
-                        shells.add(new PreparedPolygon((Polygon) p.getGeometryN(i)));
-                    }
-                }
-            }
+            else
+                shells.add(new PreparedPolygon(geometryFactory.createPolygon(ring)));
         }
         // 2. Sort the shells based on number of points to optimize step 3.
         shells.sort((o1, o2) -> o2.getGeometry().getNumPoints() - o1.getGeometry().getNumPoints());
@@ -147,6 +141,7 @@ public class ContourBuilder {
                         break outer;
                     }
                 }
+                throw new RuntimeException("Found a hole without a shell.");
             }
         }
         // 4. Build the list of punched polygons

@@ -13,13 +13,21 @@
 
 package com.graphhopper.isochrone.algorithm;
 
-import org.locationtech.jts.algorithm.CGAlgorithms;
-import org.locationtech.jts.geom.*;
-import org.locationtech.jts.geom.prep.PreparedPolygon;
-import org.locationtech.jts.simplify.VWSimplifier;
-import org.locationtech.jts.triangulate.quadedge.Vertex;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
-import java.util.*;
+import org.locationtech.jts.algorithm.CGAlgorithms;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.LinearRing;
+import org.locationtech.jts.geom.MultiPolygon;
+import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.geom.PrecisionModel;
+import org.locationtech.jts.geom.prep.PreparedPolygon;
+import org.locationtech.jts.triangulate.quadedge.Vertex;
 
 /**
  *
@@ -136,8 +144,10 @@ public class ContourBuilder {
             outer: {
                 // Probably most of the time, the first shell will be the one
                 for (PreparedPolygon shell : shells) {
-                    if (shell.contains(hole) && geometryFactory.createPolygon(hole).getArea() > MINIMUM_HOLE_AREA) {
-                        ((List<LinearRing>) shell.getGeometry().getUserData()).add(hole);
+                    if (shell.contains(hole)) {
+                        if (geometryFactory.createPolygon(hole).getArea() > MINIMUM_HOLE_AREA) {
+                            ((List<LinearRing>) shell.getGeometry().getUserData()).add(hole);
+                        }
                         break outer;
                     }
                 }

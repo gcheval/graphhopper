@@ -114,7 +114,7 @@ public class MultiCriteriaLabelSetting {
 
         MultiCriteriaLabelSettingSpliterator(int from) {
             super(0, 0);
-            Label label = new Label(startTime, EdgeIterator.NO_EDGE, from, 0, 0.0, null, 0, 0, false, null);
+            Label label = new Label(0, EdgeIterator.NO_EDGE, from, 0, 0.0, null, 0, 0, false, null);
             ArrayList<Label> labels = new ArrayList<>(1);
             labels.add(label);
             fromMap.put(from, labels);
@@ -145,7 +145,7 @@ public class MultiCriteriaLabelSetting {
                     Long firstPtDepartureTime = label.departureTime;
                     if (!reverse && (edgeType == GtfsStorage.EdgeType.ENTER_TIME_EXPANDED_NETWORK || edgeType == GtfsStorage.EdgeType.WAIT)) {
                         if (label.nTransfers == 0) {
-                            firstPtDepartureTime = nextTime - label.walkTime;
+                            nextTime = firstPtDepartureTime = label.walkTime; // SYNC departure with walking arrival when there's no transfers involved
                         }
                     } else if (reverse && (edgeType == GtfsStorage.EdgeType.LEAVE_TIME_EXPANDED_NETWORK || edgeType == GtfsStorage.EdgeType.WAIT_ARRIVAL)) {
                         if (label.nTransfers == 0) {

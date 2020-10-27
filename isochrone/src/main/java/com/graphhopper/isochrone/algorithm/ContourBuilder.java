@@ -13,12 +13,21 @@
 
 package com.graphhopper.isochrone.algorithm;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import org.locationtech.jts.algorithm.CGAlgorithms;
-import org.locationtech.jts.geom.*;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.LinearRing;
+import org.locationtech.jts.geom.MultiPolygon;
+import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.geom.PrecisionModel;
 import org.locationtech.jts.geom.prep.PreparedPolygon;
 import org.locationtech.jts.triangulate.quadedge.Vertex;
-
-import java.util.*;
 
 /**
  *
@@ -32,6 +41,7 @@ import java.util.*;
 public class ContourBuilder {
 
     private static final double EPSILON = 0.000001;
+    private static final double MINIMUM_HOLE_AREA = 0.00011;
 
     // OpenStreetMap has 1E7 (coordinates with 7 decimal places), and we walk on the edges of that grid,
     // so we use 1E8 so we can, in theory, always wedge a point petween any two OSM points.
@@ -135,7 +145,9 @@ public class ContourBuilder {
                 // Probably most of the time, the first shell will be the one
                 for (PreparedPolygon shell : shells) {
                     if (shell.contains(hole)) {
-                        ((List<LinearRing>) shell.getGeometry().getUserData()).add(hole);
+                        if (geometryFactory.createPolygon(hole).getArea() > MINIMUM_HOLE_AREA) {
+                            ((List<LinearRing>) shell.getGeometry().getUserData()).add(hole);
+                        }
                         break outer;
                     }
                 }

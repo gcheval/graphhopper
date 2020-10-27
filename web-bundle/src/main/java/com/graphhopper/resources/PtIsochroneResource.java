@@ -94,7 +94,7 @@ public class PtIsochroneResource {
             throw new IllegalArgumentException(String.format(Locale.ROOT, "Illegal value for required parameter %s: [%s]", "pt.earliest_departure_time", departureTimeString));
         }
 
-        double targetZ = initialTime.toEpochMilli() + seconds * 1000;
+        double targetZ = seconds * 1000;
 
         GeometryFactory geometryFactory = new GeometryFactory();
         final EdgeFilter filter = DefaultEdgeFilter.allEdges(graphHopperStorage.getEncodingManager().getEncoder("foot"));
@@ -105,7 +105,7 @@ public class PtIsochroneResource {
         }
 
         PtEncodedValues ptEncodedValues = PtEncodedValues.fromEncodingManager(encodingManager);
-        GraphExplorer graphExplorer = new GraphExplorer(queryGraph, new FastestWeighting(encodingManager.getEncoder("foot")), ptEncodedValues, gtfsStorage, RealtimeFeed.empty(gtfsStorage), reverseFlow, false, 5.0, reverseFlow);
+        GraphExplorer graphExplorer = new GraphExplorer(queryGraph, new FastestWeighting(encodingManager.getEncoder("foot")), ptEncodedValues, gtfsStorage, RealtimeFeed.empty(gtfsStorage), reverseFlow, false, 5.0, reverseFlow, (long) targetZ);
         MultiCriteriaLabelSetting router = new MultiCriteriaLabelSetting(graphExplorer, ptEncodedValues, reverseFlow, false, false, false, 1000000, Collections.emptyList());
 
         Map<Coordinate, Double> z1 = new HashMap<>();
@@ -116,86 +116,84 @@ public class PtIsochroneResource {
             z1.merge(nodeCoordinate, this.z.apply(nodeLabel), Math::min);
         };
 
+        router.calcLabels(snap.getClosestNode(), initialTime, blockedRouteTypes, sptVisitor, label -> {
+            return label.currentTime <= targetZ;
+        });
+        MultiPoint exploredPoints = geometryFactory.createMultiPointFromCoords(z1.keySet().toArray(new Coordinate[0]));
+
         if (format.equals("multipoint")) {
-            router.calcLabels(snap.getClosestNode(), initialTime, blockedRouteTypes, sptVisitor, label -> label.currentTime <= targetZ);
-            MultiPoint exploredPoints = geometryFactory.createMultiPointFromCoords(z1.keySet().toArray(new Coordinate[0]));
             return wrap(exploredPoints);
-        } else {
-            router.calcLabels(snap.getClosestNode(), initialTime, blockedRouteTypes, sptVisitor, label -> label.currentTime <= targetZ);
-            MultiPoint exploredPoints = geometryFactory.createMultiPointFromCoords(z1.keySet().toArray(new Coordinate[0]));
-
-            // Get at least all nodes within our bounding box (I think convex hull would be enough.)
-            // I think then we should have all possible encroaching points. (Proof needed.)
-            locationIndex.query(BBox.fromEnvelope(exploredPoints.getEnvelopeInternal()), new LocationIndex.Visitor() {
-                @Override
-                public void onNode(int nodeId) {
-                    Coordinate nodeCoordinate = new Coordinate(nodeAccess.getLongitude(nodeId), nodeAccess.getLatitude(nodeId));
-                    z1.merge(nodeCoordinate, Double.MAX_VALUE, Math::min);
-                }
-            });
-            exploredPoints = geometryFactory.createMultiPointFromCoords(z1.keySet().toArray(new Coordinate[0]));
-
-            CoordinateList siteCoords = DelaunayTriangulationBuilder.extractUniqueCoordinates(exploredPoints);
-            List<ConstraintVertex> constraintVertices = new ArrayList<>();
-            for (Object siteCoord : siteCoords) {
-                Coordinate coord = (Coordinate) siteCoord;
-                constraintVertices.add(new ConstraintVertex(coord));
+        }
+        // Get at least all nodes within our bounding box (I think convex hull would be enough.)
+        // I think then we should have all possible encroaching points. (Proof needed.)
+        locationIndex.query(BBox.fromEnvelope(exploredPoints.getEnvelopeInternal()), new LocationIndex.Visitor() {
+            @Override
+            public void onNode(int nodeId) {
+                Coordinate nodeCoordinate = new Coordinate(nodeAccess.getLongitude(nodeId), nodeAccess.getLatitude(nodeId));
+                z1.merge(nodeCoordinate, Double.MAX_VALUE, Math::min);
             }
+        });
+        exploredPoints = geometryFactory.createMultiPointFromCoords(z1.keySet().toArray(new Coordinate[0]));
 
-            ConformingDelaunayTriangulator cdt = new ConformingDelaunayTriangulator(constraintVertices, JTS_TOLERANCE);
-            cdt.setConstraints(new ArrayList(), new ArrayList());
-            cdt.formInitialDelaunay();
+        CoordinateList siteCoords = DelaunayTriangulationBuilder.extractUniqueCoordinates(exploredPoints);
+        List<ConstraintVertex> constraintVertices = new ArrayList<>();
+        for (Object siteCoord : siteCoords) {
+            Coordinate coord = (Coordinate) siteCoord;
+            constraintVertices.add(new ConstraintVertex(coord));
+        }
 
-            QuadEdgeSubdivision tin = cdt.getSubdivision();
+        ConformingDelaunayTriangulator cdt = new ConformingDelaunayTriangulator(constraintVertices, JTS_TOLERANCE);
+        cdt.setConstraints(new ArrayList(), new ArrayList());
+        cdt.formInitialDelaunay();
 
-            for (Vertex vertex : (Collection<Vertex>) tin.getVertices(true)) {
-                if (tin.isFrameVertex(vertex)) {
-                    vertex.setZ(Double.MAX_VALUE);
-                } else {
-                    Double aDouble = z1.get(vertex.getCoordinate());
-                    if (aDouble != null) {
-                        vertex.setZ(aDouble);
-                    } else {
-                        vertex.setZ(Double.MAX_VALUE);
-                    }
-                }
-            }
+        QuadEdgeSubdivision tin = cdt.getSubdivision();
 
-            ReadableTriangulation triangulation = ReadableTriangulation.wrap(tin);
-            ContourBuilder contourBuilder = new ContourBuilder(triangulation);
-            MultiPolygon isoline = contourBuilder.computeIsoline(targetZ, triangulation.getEdges());
-
-            // debugging tool
-            if (format.equals("triangulation")) {
-                Response response = new Response();
-                for (Vertex vertex : (Collection<Vertex>) tin.getVertices(true)) {
-                    JsonFeature feature = new JsonFeature();
-                    feature.setGeometry(geometryFactory.createPoint(vertex.getCoordinate()));
-                    HashMap<String, Object> properties = new HashMap<>();
-                    properties.put("z", vertex.getZ());
-                    feature.setProperties(properties);
-                    response.polygons.add(feature);
-                }
-                for (QuadEdge edge : (Collection<QuadEdge>) tin.getPrimaryEdges(false)) {
-                    JsonFeature feature = new JsonFeature();
-                    feature.setGeometry(edge.toLineSegment().toGeometry(geometryFactory));
-                    HashMap<String, Object> properties = new HashMap<>();
-                    feature.setProperties(properties);
-                    response.polygons.add(feature);
-                }
-                JsonFeature feature = new JsonFeature();
-                feature.setGeometry(isoline);
-                HashMap<String, Object> properties = new HashMap<>();
-                properties.put("z", targetZ);
-                feature.setProperties(properties);
-                response.polygons.add(feature);
-                response.info.copyrights.addAll(WebHelper.COPYRIGHTS);
-                return response;
+        for (Vertex vertex : (Collection<Vertex>) tin.getVertices(true)) {
+            if (tin.isFrameVertex(vertex)) {
+                vertex.setZ(Double.MAX_VALUE);
             } else {
-                return wrap(isoline);
+                Double aDouble = z1.get(vertex.getCoordinate());
+                if (aDouble != null) {
+                    vertex.setZ(aDouble);
+                } else {
+                    vertex.setZ(Double.MAX_VALUE);
+                }
             }
         }
 
+        ReadableTriangulation triangulation = ReadableTriangulation.wrap(tin);
+        ContourBuilder contourBuilder = new ContourBuilder(triangulation);
+        MultiPolygon isoline = contourBuilder.computeIsoline(targetZ, triangulation.getEdges());
+
+        // debugging tool
+        if (format.equals("triangulation")) {
+            Response response = new Response();
+            for (Vertex vertex : (Collection<Vertex>) tin.getVertices(true)) {
+                JsonFeature feature = new JsonFeature();
+                feature.setGeometry(geometryFactory.createPoint(vertex.getCoordinate()));
+                HashMap<String, Object> properties = new HashMap<>();
+                properties.put("z", vertex.getZ());
+                feature.setProperties(properties);
+                response.polygons.add(feature);
+            }
+            for (QuadEdge edge : (Collection<QuadEdge>) tin.getPrimaryEdges(false)) {
+                JsonFeature feature = new JsonFeature();
+                feature.setGeometry(edge.toLineSegment().toGeometry(geometryFactory));
+                HashMap<String, Object> properties = new HashMap<>();
+                feature.setProperties(properties);
+                response.polygons.add(feature);
+            }
+            JsonFeature feature = new JsonFeature();
+            feature.setGeometry(isoline);
+            HashMap<String, Object> properties = new HashMap<>();
+            properties.put("z", targetZ);
+            feature.setProperties(properties);
+            response.polygons.add(feature);
+            response.info.copyrights.addAll(WebHelper.COPYRIGHTS);
+            return response;
+        } else {
+            return wrap(isoline);
+        }
     }
 
     private Response wrap(Geometry isoline) {

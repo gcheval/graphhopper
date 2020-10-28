@@ -17,6 +17,10 @@
  */
 package com.graphhopper.storage;
 
+import static com.graphhopper.util.Helper.nf;
+
+import java.util.Locale;
+
 import com.graphhopper.routing.ev.BooleanEncodedValue;
 import com.graphhopper.routing.ev.DecimalEncodedValue;
 import com.graphhopper.routing.ev.EnumEncodedValue;
@@ -26,13 +30,15 @@ import com.graphhopper.routing.util.EdgeFilter;
 import com.graphhopper.routing.util.EncodingManager;
 import com.graphhopper.routing.weighting.Weighting;
 import com.graphhopper.search.StringIndex;
-import com.graphhopper.util.*;
+import com.graphhopper.util.BitUtil;
+import com.graphhopper.util.EdgeExplorer;
+import com.graphhopper.util.EdgeIterator;
+import com.graphhopper.util.EdgeIteratorState;
+import com.graphhopper.util.FetchMode;
+import com.graphhopper.util.GHUtility;
+import com.graphhopper.util.Helper;
+import com.graphhopper.util.PointList;
 import com.graphhopper.util.shapes.BBox;
-
-import java.util.Collections;
-import java.util.Locale;
-
-import static com.graphhopper.util.Helper.nf;
 
 /**
  * The base graph handles nodes and edges file format. It can be used with different Directory
@@ -828,11 +834,11 @@ class BaseGraph implements Graph {
     }
 
     private void setName(long edgePointer, String name) {
-        int stringIndexRef = (int) stringIndex.add(Collections.singletonMap(STRING_IDX_NAME_KEY, name));
-        if (stringIndexRef < 0)
-            throw new IllegalStateException("Too many names are stored, currently limited to int pointer");
-
-        edges.setInt(edgePointer + E_NAME, stringIndexRef);
+//        int stringIndexRef = (int) stringIndex.add(Collections.singletonMap(STRING_IDX_NAME_KEY, name));
+//        if (stringIndexRef < 0)
+//            throw new IllegalStateException("Too many names are stored, currently limited to int pointer");
+//
+//        edges.setInt(edgePointer + E_NAME, stringIndexRef);
     }
 
     private void ensureGeometry(long bytePos, int byteLength) {

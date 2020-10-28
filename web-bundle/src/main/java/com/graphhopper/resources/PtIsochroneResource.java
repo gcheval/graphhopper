@@ -18,7 +18,42 @@
 
 package com.graphhopper.resources;
 
-import com.graphhopper.gtfs.*;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
+import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
+
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.CoordinateList;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.MultiPoint;
+import org.locationtech.jts.geom.MultiPolygon;
+import org.locationtech.jts.triangulate.ConformingDelaunayTriangulator;
+import org.locationtech.jts.triangulate.ConstraintVertex;
+import org.locationtech.jts.triangulate.DelaunayTriangulationBuilder;
+import org.locationtech.jts.triangulate.quadedge.QuadEdge;
+import org.locationtech.jts.triangulate.quadedge.QuadEdgeSubdivision;
+import org.locationtech.jts.triangulate.quadedge.Vertex;
+
+import com.graphhopper.gtfs.GraphExplorer;
+import com.graphhopper.gtfs.GtfsStorage;
+import com.graphhopper.gtfs.Label;
+import com.graphhopper.gtfs.MultiCriteriaLabelSetting;
+import com.graphhopper.gtfs.PtEncodedValues;
+import com.graphhopper.gtfs.RealtimeFeed;
 import com.graphhopper.http.WebHelper;
 import com.graphhopper.isochrone.algorithm.ContourBuilder;
 import com.graphhopper.isochrone.algorithm.ReadableTriangulation;
@@ -34,20 +69,6 @@ import com.graphhopper.storage.index.LocationIndex;
 import com.graphhopper.storage.index.Snap;
 import com.graphhopper.util.shapes.BBox;
 import com.graphhopper.util.shapes.GHPoint;
-import org.locationtech.jts.geom.*;
-import org.locationtech.jts.triangulate.ConformingDelaunayTriangulator;
-import org.locationtech.jts.triangulate.ConstraintVertex;
-import org.locationtech.jts.triangulate.DelaunayTriangulationBuilder;
-import org.locationtech.jts.triangulate.quadedge.QuadEdge;
-import org.locationtech.jts.triangulate.quadedge.QuadEdgeSubdivision;
-import org.locationtech.jts.triangulate.quadedge.Vertex;
-
-import javax.inject.Inject;
-import javax.ws.rs.*;
-import javax.ws.rs.core.MediaType;
-import java.time.Instant;
-import java.util.*;
-import java.util.function.Function;
 
 @Path("isochrone-pt")
 public class PtIsochroneResource {
@@ -94,7 +115,7 @@ public class PtIsochroneResource {
             throw new IllegalArgumentException(String.format(Locale.ROOT, "Illegal value for required parameter %s: [%s]", "pt.earliest_departure_time", departureTimeString));
         }
 
-        double targetZ = initialTime.toEpochMilli() + seconds * 1000;
+        double targetZ = seconds * 1000;
 
         GeometryFactory geometryFactory = new GeometryFactory();
         final EdgeFilter filter = DefaultEdgeFilter.allEdges(graphHopperStorage.getEncodingManager().getEncoder("foot"));
@@ -105,7 +126,7 @@ public class PtIsochroneResource {
         }
 
         PtEncodedValues ptEncodedValues = PtEncodedValues.fromEncodingManager(encodingManager);
-        GraphExplorer graphExplorer = new GraphExplorer(queryGraph, new FastestWeighting(encodingManager.getEncoder("foot")), ptEncodedValues, gtfsStorage, RealtimeFeed.empty(gtfsStorage), reverseFlow, false, 5.0, reverseFlow);
+        GraphExplorer graphExplorer = new GraphExplorer(queryGraph, new FastestWeighting(encodingManager.getEncoder("foot")), ptEncodedValues, gtfsStorage, RealtimeFeed.empty(gtfsStorage), reverseFlow, false, 5.0, reverseFlow, (long) targetZ);
         MultiCriteriaLabelSetting router = new MultiCriteriaLabelSetting(graphExplorer, ptEncodedValues, reverseFlow, false, false, false, 1000000, Collections.emptyList());
 
         Map<Coordinate, Double> z1 = new HashMap<>();

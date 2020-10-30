@@ -22,14 +22,14 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>directions-api-client-hc</artifactId>
-    <version>2.1.4</version>
+    <version>2.1.5</version>
     <packaging>jar</packaging>
     <name>GraphHopper Directions API hand-crafted Java Client.</name>
      
     <parent>
         <groupId>com.expedia.geo.graphhopper</groupId>
         <artifactId>graphhopper-parent</artifactId>
-        <version>2.1.4</version>
+        <version>2.1.5</version>
     </parent>  
     
     <dependencies>

@@ -19,6 +19,7 @@ package com.graphhopper.storage;
 
 import static com.graphhopper.util.Helper.nf;
 
+import java.util.Collections;
 import java.util.Locale;
 
 import com.graphhopper.routing.ev.BooleanEncodedValue;
@@ -834,11 +835,11 @@ class BaseGraph implements Graph {
     }
 
     private void setName(long edgePointer, String name) {
-//        int stringIndexRef = (int) stringIndex.add(Collections.singletonMap(STRING_IDX_NAME_KEY, name));
-//        if (stringIndexRef < 0)
-//            throw new IllegalStateException("Too many names are stored, currently limited to int pointer");
-//
-//        edges.setInt(edgePointer + E_NAME, stringIndexRef);
+        int stringIndexRef = (int) stringIndex.add(Collections.singletonMap(STRING_IDX_NAME_KEY, name));
+        if (stringIndexRef < 0)
+            throw new IllegalStateException("Too many names are stored, currently limited to int pointer");
+
+        edges.setInt(edgePointer + E_NAME, stringIndexRef);
     }
 
     private void ensureGeometry(long bytePos, int byteLength) {

@@ -26,11 +26,25 @@
 
 package com.conveyal.gtfs;
 
-import com.conveyal.gtfs.error.GTFSError;
-import com.conveyal.gtfs.error.GeneralError;
-import com.conveyal.gtfs.model.Calendar;
-import com.conveyal.gtfs.model.*;
-import com.google.common.collect.Iterables;
+import java.io.Closeable;
+import java.io.File;
+import java.io.IOException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateList;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -43,17 +57,26 @@ import org.mapdb.Fun.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.concurrent.ConcurrentNavigableMap;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
+import com.conveyal.gtfs.error.GTFSError;
+import com.conveyal.gtfs.error.GeneralError;
+import com.conveyal.gtfs.model.Agency;
+import com.conveyal.gtfs.model.Calendar;
+import com.conveyal.gtfs.model.CalendarDate;
+import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.Fare;
+import com.conveyal.gtfs.model.FareAttribute;
+import com.conveyal.gtfs.model.FareRule;
+import com.conveyal.gtfs.model.FeedInfo;
+import com.conveyal.gtfs.model.Frequency;
+import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.Service;
+import com.conveyal.gtfs.model.Shape;
+import com.conveyal.gtfs.model.ShapePoint;
+import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Transfer;
+import com.conveyal.gtfs.model.Trip;
+import com.google.common.collect.Iterables;
 
 /**
  * All entities must be from a single feed namespace.
